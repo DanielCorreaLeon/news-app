@@ -1,4 +1,4 @@
-import type { MusicItem } from "./types";
+import type { MusicItem, ReleaseSource } from "./types";
 
 type TokenState = { accessToken: string; expiresAt: number };
 let tokenCache: TokenState | null = null;
@@ -22,9 +22,7 @@ async function getToken(): Promise<string> {
     body: "grant_type=client_credentials",
     cache: "no-store",
   });
-  if (!res.ok) {
-    throw new Error(`Spotify token error: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`Spotify token error: ${res.status}`);
   const json = (await res.json()) as { access_token: string; expires_in: number };
   tokenCache = {
     accessToken: json.access_token,
@@ -33,31 +31,17 @@ async function getToken(): Promise<string> {
   return tokenCache.accessToken;
 }
 
-async function spotifyFetch<T>(path: string): Promise<T> {
+async function sp<T>(path: string): Promise<T> {
   const token = await getToken();
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     next: { revalidate: 600 },
   });
-  if (!res.ok) {
-    throw new Error(`Spotify error ${res.status} on ${path}`);
-  }
+  if (!res.ok) throw new Error(`Spotify error ${res.status} on ${path}`);
   return (await res.json()) as T;
 }
 
-type ArtistSearch = {
-  artists: { items: Array<{ id: string; name: string }> };
-};
-
-async function findArtistId(name: string): Promise<string | null> {
-  const q = encodeURIComponent(name);
-  const data = await spotifyFetch<ArtistSearch>(
-    `/search?q=${q}&type=artist&limit=1`,
-  );
-  return data.artists.items[0]?.id ?? null;
-}
-
-type Album = {
+type SpotifyAlbum = {
   id: string;
   name: string;
   album_type: "single" | "album" | "compilation";
@@ -67,60 +51,163 @@ type Album = {
   artists: Array<{ name: string }>;
 };
 
-type AlbumList = { items: Album[] };
+type ArtistSearchRes = {
+  artists: {
+    items: Array<{ id: string; name: string; genres?: string[] }>;
+  };
+};
 
-async function getArtistReleases(
-  artistId: string,
-  limit = 6,
-): Promise<Album[]> {
-  const data = await spotifyFetch<AlbumList>(
-    `/artists/${artistId}/albums?include_groups=single,album&limit=${limit}&market=US`,
+type AlbumSearchRes = { albums: { items: SpotifyAlbum[] } };
+type ArtistAlbumsRes = { items: SpotifyAlbum[] };
+type ArtistInfo = { id: string; name: string; genres: string[] };
+
+async function findArtist(name: string): Promise<ArtistInfo | null> {
+  const q = encodeURIComponent(name);
+  const data = await sp<ArtistSearchRes>(
+    `/search?q=${q}&type=artist&limit=1`,
+  );
+  const hit = data.artists.items[0];
+  if (!hit) return null;
+  const full = await sp<ArtistInfo>(`/artists/${hit.id}`);
+  return { id: full.id, name: full.name, genres: full.genres ?? [] };
+}
+
+async function getArtistAlbums(id: string): Promise<SpotifyAlbum[]> {
+  const data = await sp<ArtistAlbumsRes>(
+    `/artists/${id}/albums?include_groups=single,album&limit=30&market=US`,
   );
   return data.items;
 }
 
-export async function getNewReleasesForArtists(
-  artists: string[],
-  excludeArtists: string[] = [],
+async function searchAlbums(query: string, limit: number): Promise<SpotifyAlbum[]> {
+  const q = encodeURIComponent(query);
+  const data = await sp<AlbumSearchRes>(
+    `/search?q=${q}&type=album&limit=${Math.min(limit, 50)}&market=US`,
+  );
+  return data.albums.items;
+}
+
+function toMusicItem(
+  a: SpotifyAlbum,
+  source: ReleaseSource,
+  extras: { matchedSeed?: string; matchedGenre?: string } = {},
+): MusicItem {
+  return {
+    id: a.id,
+    title: a.name,
+    artist: a.artists.map((x) => x.name).join(", "),
+    image: a.images[0]?.url ?? null,
+    url: a.external_urls.spotify,
+    releaseDate: a.release_date,
+    albumType: a.album_type,
+    source,
+    ...extras,
+  };
+}
+
+export async function getReleasesInspiredBy(
+  seedArtistNames: string[],
+  excludedNames: string[] = [],
+  listening?: string,
 ): Promise<MusicItem[]> {
-  const blocked = new Set(excludeArtists.map((a) => a.toLowerCase().trim()));
-  const uniqueArtists = Array.from(
+  const year = String(new Date().getFullYear());
+  const blocked = new Set(excludedNames.map((n) => n.toLowerCase().trim()));
+
+  const uniqueSeeds = Array.from(
     new Set(
-      artists.map((a) => a.trim()).filter((a) => a && !blocked.has(a.toLowerCase())),
+      seedArtistNames
+        .map((a) => a.trim())
+        .filter((a) => a && !blocked.has(a.toLowerCase())),
     ),
   );
 
-  const releases = await Promise.all(
-    uniqueArtists.map(async (name): Promise<MusicItem[]> => {
-      try {
-        const id = await findArtistId(name);
-        if (!id) return [];
-        const albums = await getArtistReleases(id, 4);
-        return albums.map((a) => ({
-          id: a.id,
-          title: a.name,
-          artist: a.artists.map((x) => x.name).join(", ") || name,
-          image: a.images[0]?.url ?? null,
-          url: a.external_urls.spotify,
-          releaseDate: a.release_date,
-          albumType: a.album_type,
-        }));
-      } catch {
-        return [];
-      }
-    }),
+  // 1. Resolve seeds → ids + genres
+  const seeds = (
+    await Promise.all(uniqueSeeds.map((n) => findArtist(n).catch(() => null)))
+  ).filter((s): s is ArtistInfo => s !== null);
+
+  // 2. Top 3 genres by frequency across seeds
+  const genreCounts = new Map<string, number>();
+  for (const s of seeds) {
+    for (const g of s.genres) {
+      genreCounts.set(g, (genreCounts.get(g) ?? 0) + 1);
+    }
+  }
+  const topGenres = Array.from(genreCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([g]) => g);
+
+  // 3. In parallel: seed albums, similar-genre albums, listening search
+  const [seedAlbumsNested, genreAlbumsNested, listeningAlbums] = await Promise.all([
+    Promise.all(
+      seeds.map(async (s) => {
+        try {
+          const albums = await getArtistAlbums(s.id);
+          return albums
+            .filter((a) => a.release_date.startsWith(year))
+            .map((a) => toMusicItem(a, "seed", { matchedSeed: s.name }));
+        } catch {
+          return [] as MusicItem[];
+        }
+      }),
+    ),
+    Promise.all(
+      topGenres.map(async (g) => {
+        try {
+          const q = `genre:"${g}" year:${year}`;
+          const albums = await searchAlbums(q, 10);
+          return albums
+            .filter((a) => a.release_date.startsWith(year))
+            .map((a) => toMusicItem(a, "similar", { matchedGenre: g }));
+        } catch {
+          return [] as MusicItem[];
+        }
+      }),
+    ),
+    listening
+      ? searchAlbums(`${listening} year:${year}`, 12)
+          .then((albums) =>
+            albums
+              .filter((a) => a.release_date.startsWith(year))
+              .map((a) => toMusicItem(a, "listening")),
+          )
+          .catch(() => [] as MusicItem[])
+      : Promise.resolve([] as MusicItem[]),
+  ]);
+
+  const all = [
+    ...seedAlbumsNested.flat(),
+    ...genreAlbumsNested.flat(),
+    ...listeningAlbums,
+  ];
+
+  // 4. Exclude blocked artists
+  const notBlocked = all.filter(
+    (it) =>
+      !it.artist
+        .toLowerCase()
+        .split(",")
+        .some((a) => blocked.has(a.trim())),
   );
 
-  const flat = releases.flat();
-  flat.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate));
-  const seen = new Set<string>();
-  const unique: MusicItem[] = [];
-  for (const item of flat) {
-    const key = `${item.artist}::${item.title.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(item);
-    if (unique.length >= 12) break;
+  // 5. Dedupe by album ID, prefer "seed" > "listening" > "similar" when collisions
+  const priority: Record<ReleaseSource, number> = {
+    seed: 0,
+    listening: 1,
+    similar: 2,
+  };
+  const byId = new Map<string, MusicItem>();
+  for (const it of notBlocked) {
+    const existing = byId.get(it.id);
+    if (!existing || priority[it.source] < priority[existing.source]) {
+      byId.set(it.id, it);
+    }
   }
-  return unique;
+
+  // 6. Sort by release_date desc
+  const unique = Array.from(byId.values());
+  unique.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate));
+
+  return unique.slice(0, 18);
 }

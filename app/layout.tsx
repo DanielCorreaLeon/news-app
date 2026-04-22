@@ -19,9 +19,9 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Daily — Música e IA, a tu medida",
+  title: "Daily — Nuevos lanzamientos, inspirados en vos",
   description:
-    "Tu dosis diaria de nuevos lanzamientos musicales y novedades de inteligencia artificial, personalizadas para vos.",
+    "Tu feed personal de lanzamientos musicales de este año. Artistas que te gustan + similares + lo que estás escuchando hoy.",
 };
 
 export default function RootLayout({

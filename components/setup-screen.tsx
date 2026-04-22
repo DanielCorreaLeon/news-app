@@ -2,27 +2,21 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
-import type { AiPrefs, Category, MusicPrefs } from "@/lib/types";
+import type { MusicPrefs } from "@/lib/types";
 import { PrefsEditor } from "./prefs-editor";
 
 type Props = {
-  category: Category;
-  prefs: MusicPrefs | AiPrefs;
-  title: string;
-  eyebrow: string;
+  prefs: MusicPrefs;
   accentFrom: string;
   accentTo: string;
   feedHref: string;
-  onPrefsChange: (next: MusicPrefs | AiPrefs) => void;
+  onPrefsChange: (next: MusicPrefs) => void;
 };
 
 export function SetupScreen({
-  category,
   prefs,
-  title,
-  eyebrow,
   accentFrom,
   accentTo,
   feedHref,
@@ -30,81 +24,69 @@ export function SetupScreen({
 }: Props) {
   const [note, setNote] = useState("");
 
-  const hasEnoughPrefs =
-    category === "music"
-      ? (prefs as MusicPrefs).likedArtists.length > 0
-      : (prefs as AiPrefs).topics.length > 0 ||
-        (prefs as AiPrefs).toolsInUse.length > 0;
-
-  const intro = (() => {
-    if (category === "music") {
-      const p = prefs as MusicPrefs;
-      if (p.likedArtists.length === 0) {
-        return "Agregá algunos artistas que te gusten y armamos tu feed de lanzamientos.";
-      }
-      return `Ya tenemos tus artistas. Si querés ajustar algo, editalo acá abajo.`;
-    }
-    const p = prefs as AiPrefs;
-    if (p.topics.length === 0 && p.toolsInUse.length === 0) {
-      return "Elegí qué te interesa y qué tools usás — con eso filtramos las novedades.";
-    }
-    return "Ajustá tópicos o tools si querés refinar el feed de hoy.";
-  })();
+  const hasSeeds = prefs.likedArtists.length > 0;
+  const savedNote = prefs.lastSession.listening;
 
   const handleSaveNote = () => {
     if (!note.trim()) return;
-    if (category === "music") {
-      const p = prefs as MusicPrefs;
-      onPrefsChange({
-        ...p,
-        lastSession: { ...p.lastSession, listening: note.trim() },
-      });
-    } else {
-      const p = prefs as AiPrefs;
-      onPrefsChange({
-        ...p,
-        lastSession: { ...p.lastSession, focus: note.trim() },
-      });
-    }
+    onPrefsChange({
+      ...prefs,
+      lastSession: { ...prefs.lastSession, listening: note.trim() },
+    });
     setNote("");
   };
 
-  const savedNote =
-    category === "music"
-      ? (prefs as MusicPrefs).lastSession.listening
-      : (prefs as AiPrefs).lastSession.focus;
+  const clearNote = () => {
+    onPrefsChange({
+      ...prefs,
+      lastSession: { ...prefs.lastSession, listening: undefined },
+    });
+  };
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 pb-32 md:px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="size-4" />
-          Volver
-        </Link>
+      <header className="flex items-center gap-2 py-6">
+        <div className="relative">
+          <span className="block size-2.5 rounded-full bg-[var(--music-from)]" />
+          <span className="absolute inset-0 size-2.5 animate-ping rounded-full bg-[var(--music-from)] opacity-60" />
+        </div>
+        <span className="font-display text-sm font-semibold tracking-[0.2em] uppercase text-foreground/80">
+          Daily
+        </span>
+        <span className="ml-auto hidden text-xs tracking-widest uppercase text-muted-foreground md:inline">
+          {new Intl.DateTimeFormat("es-AR", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+          })
+            .format(new Date())
+            .toUpperCase()}
+        </span>
       </header>
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
+        className="mb-8 mt-4"
       >
-        <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground">
-          {eyebrow}
+        <p className="mb-3 text-xs tracking-[0.2em] uppercase text-muted-foreground">
+          Tu música hoy
         </p>
-        <h1 className="font-display text-4xl font-bold tracking-tight md:text-6xl">
-          {title}
+        <h1 className="font-display text-5xl leading-[0.95] font-bold tracking-tighter text-balance md:text-7xl">
+          Nuevos{" "}
+          <span className="bg-gradient-to-r from-[var(--music-from)] via-[var(--music-to)] to-[oklch(0.6_0.2_240)] bg-clip-text text-transparent">
+            lanzamientos
+          </span>
+          , inspirados en vos.
         </h1>
-        <p className="mt-3 max-w-xl text-base text-muted-foreground text-pretty md:text-lg">
-          {intro}
+        <p className="mt-5 max-w-xl text-base text-muted-foreground text-pretty md:text-lg">
+          Contame qué artistas te prenden y qué estás escuchando hoy. Armamos un feed
+          con releases de este año — de tus artistas y de otros que suenan parecido.
         </p>
       </motion.div>
 
       <div className="space-y-4">
         <PrefsEditor
-          category={category}
           prefs={prefs}
           onChange={onPrefsChange}
           accentFrom={accentFrom}
@@ -114,14 +96,12 @@ export function SetupScreen({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="rounded-2xl border border-border bg-card/40 p-4"
+          className="rounded-2xl border border-border bg-card/40 p-4 md:p-5"
         >
           <label className="mb-2 block text-xs tracking-wider uppercase text-muted-foreground">
-            {category === "music"
-              ? "¿Qué estás escuchando hoy? (opcional)"
-              : "¿Algo puntual que querés ver hoy? (opcional)"}
+            ¿Qué estás escuchando hoy? <span className="lowercase text-foreground/40">(opcional, pero ayuda)</span>
           </label>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -132,24 +112,31 @@ export function SetupScreen({
                 }
               }}
               placeholder={
-                category === "music"
-                  ? savedNote ?? "Un álbum, un vibe, un género…"
-                  : savedNote ?? "Ej: agentes open source, Claude 4.7, etc."
+                savedNote ?? "un género, un álbum, un vibe, un artista nuevo…"
               }
               className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
             <button
               onClick={handleSaveNote}
               disabled={!note.trim()}
-              className="rounded-full border border-border px-3 py-2 text-sm transition-colors hover:border-foreground/40 disabled:opacity-40"
+              className="rounded-full border border-border px-4 py-2 text-sm transition-colors hover:border-foreground/40 disabled:opacity-40"
             >
               Guardar
             </button>
           </div>
           {savedNote && !note && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Ahora: <span className="text-foreground">{savedNote}</span>
-            </p>
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Hoy:</span>
+              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-foreground">
+                {savedNote}
+              </span>
+              <button
+                onClick={clearNote}
+                className="ml-1 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                limpiar
+              </button>
+            </div>
           )}
         </motion.div>
       </div>
@@ -161,14 +148,12 @@ export function SetupScreen({
         className="mt-10"
       >
         <Link
-          href={hasEnoughPrefs ? feedHref : "#"}
+          href={hasSeeds ? feedHref : "#"}
           onClick={(e) => {
-            if (!hasEnoughPrefs) e.preventDefault();
+            if (!hasSeeds) e.preventDefault();
           }}
-          className={`group flex items-center justify-between rounded-3xl p-6 text-white shadow-2xl transition-transform ${
-            hasEnoughPrefs
-              ? "hover:scale-[1.02]"
-              : "cursor-not-allowed opacity-50"
+          className={`group flex items-center justify-between rounded-3xl p-6 text-white shadow-2xl transition-transform md:p-8 ${
+            hasSeeds ? "hover:scale-[1.02]" : "cursor-not-allowed opacity-50"
           }`}
           style={{
             background: `linear-gradient(135deg, ${accentFrom}, ${accentTo})`,
@@ -176,9 +161,9 @@ export function SetupScreen({
         >
           <div>
             <p className="text-xs tracking-widest uppercase opacity-80">
-              {hasEnoughPrefs ? "Todo listo" : "Agregá algo arriba"}
+              {hasSeeds ? "Todo listo" : "Agregá al menos un artista"}
             </p>
-            <p className="font-display text-2xl font-bold md:text-3xl">
+            <p className="font-display text-3xl font-bold md:text-4xl">
               Ver mi feed
             </p>
           </div>
@@ -187,6 +172,10 @@ export function SetupScreen({
           </div>
         </Link>
       </motion.div>
+
+      <footer className="mt-auto pt-16 text-xs text-muted-foreground">
+        Tus preferencias viven en tu navegador. Nada se sube a un servidor.
+      </footer>
     </main>
   );
 }

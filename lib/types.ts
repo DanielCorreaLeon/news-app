@@ -1,5 +1,3 @@
-export type Category = "music" | "ai";
-
 export type MusicPrefs = {
   likedArtists: string[];
   dislikedArtists: string[];
@@ -11,37 +9,7 @@ export type MusicPrefs = {
   };
 };
 
-export const AI_TOPICS = [
-  "models",
-  "coding",
-  "agents",
-  "image",
-  "research",
-  "startups",
-] as const;
-
-export type AiTopic = (typeof AI_TOPICS)[number];
-
-export type AiPrefs = {
-  topics: AiTopic[];
-  toolsInUse: string[];
-  lastSession: {
-    focus?: string;
-    updatedAt: string;
-  };
-};
-
-export type NewsItem = {
-  id: string;
-  title: string;
-  snippet: string;
-  image: string | null;
-  source: string;
-  url: string;
-  publishedAt: string;
-  tag?: string;
-  fallbackGradient?: string;
-};
+export type ReleaseSource = "seed" | "similar" | "listening";
 
 export type MusicItem = {
   id: string;
@@ -51,8 +19,7 @@ export type MusicItem = {
   url: string;
   releaseDate: string;
   albumType: "single" | "album" | "compilation";
+  source: ReleaseSource;
+  matchedSeed?: string;
+  matchedGenre?: string;
 };
-
-export type FeedItem =
-  | ({ kind: "news" } & NewsItem)
-  | ({ kind: "music" } & MusicItem);

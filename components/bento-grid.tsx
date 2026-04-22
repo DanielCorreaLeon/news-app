@@ -1,10 +1,10 @@
 "use client";
 
-import type { FeedItem } from "@/lib/types";
+import type { MusicItem } from "@/lib/types";
 import { NewsCard, type BentoSize } from "./news-card";
 
 type Props = {
-  items: FeedItem[];
+  items: MusicItem[];
   accentFrom: string;
 };
 
@@ -27,7 +27,6 @@ const PATTERN: BentoSize[] = [
 
 export function BentoGrid({ items, accentFrom }: Props) {
   if (items.length === 0) return null;
-
   return (
     <div className="grid auto-rows-[200px] grid-cols-1 gap-4 md:grid-cols-4">
       {items.map((item, i) => (

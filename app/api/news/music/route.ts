@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getNewReleasesForArtists } from "@/lib/spotify";
+import { getReleasesInspiredBy } from "@/lib/spotify";
 
 export const runtime = "nodejs";
 
@@ -13,13 +13,14 @@ export async function GET(req: Request) {
     .split(",")
     .map((a) => a.trim())
     .filter(Boolean);
+  const listening = (searchParams.get("listening") ?? "").trim() || undefined;
 
   if (artists.length === 0) {
     return NextResponse.json({ items: [] });
   }
 
   try {
-    const items = await getNewReleasesForArtists(artists, exclude);
+    const items = await getReleasesInspiredBy(artists, exclude, listening);
     return NextResponse.json({ items });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
