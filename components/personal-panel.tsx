@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { ArrowRight, Music2 } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useMusicPrefs } from "@/lib/preferences";
 import type { MusicItem } from "@/lib/types";
 
@@ -36,8 +36,6 @@ export function PersonalPanel({ name, fallbackCovers }: Props) {
   }, [seeds.length, seedKey]);
 
   const personalForRender = seeds.length === 0 ? null : personal;
-
-  const hasSeeds = seeds.length > 0;
   const mosaicSource: Cover[] =
     personalForRender && personalForRender.length > 0
       ? personalForRender.map((p) => ({
@@ -45,89 +43,97 @@ export function PersonalPanel({ name, fallbackCovers }: Props) {
           artist: p.artist,
           title: p.title,
         }))
-      : fallbackCovers.slice(0, 4).map((c) => ({ ...c }));
+      : fallbackCovers.slice(0, 4);
 
   const mosaic = mosaicSource.filter((c) => c.image).slice(0, 4);
+  const hasSeeds = seeds.length > 0;
+  const eyebrow = hasSeeds ? "Tu perfil" : "Descubrí lanzamientos";
+  const subtitle = hasSeeds
+    ? seeds.slice(0, 4).join(" · ") +
+      (seeds.length > 4 ? ` · +${seeds.length - 4}` : "")
+    : "Configura tus artistas";
+  const ctaLabel = hasSeeds ? "Ir a mi feed" : "Empezar";
+  const ctaHref = hasSeeds ? "/feed" : "/setup";
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
-      className="glass relative overflow-hidden rounded-3xl border border-border p-6 md:p-7"
+      transition={{ duration: 0.6, delay: 0.15 }}
+      whileHover={{ y: -4 }}
+      className="group relative block aspect-[4/5] w-full overflow-hidden rounded-3xl"
     >
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-[var(--music-from)] to-[var(--music-to)] text-white shadow-lg">
-          <Music2 className="size-5" strokeWidth={2.5} />
-        </div>
-        <div>
-          <p className="text-xs tracking-widest uppercase text-muted-foreground">
-            {hasSeeds ? "Tu perfil" : "Nueva acá"}
-          </p>
-          <p className="font-display text-xl font-bold tracking-tight md:text-2xl">
-            Hola, {name}
-          </p>
-        </div>
-      </div>
-
       {mosaic.length >= 4 ? (
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
           {mosaic.map((c, i) => (
-            <motion.div
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               key={c.image + i}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 + i * 0.08 }}
-              className="relative aspect-square overflow-hidden rounded-xl"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={c.image}
-                alt={`${c.artist} — ${c.title}`}
-                className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-              />
-            </motion.div>
+              src={c.image}
+              alt={`${c.artist} — ${c.title}`}
+              className="h-full w-full object-cover"
+            />
           ))}
         </div>
       ) : (
-        <div className="aspect-[2/1] rounded-xl bg-gradient-to-br from-[var(--music-from)]/30 to-[var(--music-to)]/30" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.3 0.15 240) 0%, oklch(0.2 0.12 220) 100%)",
+          }}
+        />
       )}
 
-      <div className="mt-5">
-        {hasSeeds ? (
-          <>
-            <p className="mb-2 text-xs tracking-wider uppercase text-muted-foreground">
-              {seeds.length === 1 ? "Tu artista" : "Tus artistas"}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {seeds.slice(0, 8).map((s) => (
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
+      <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-transparent" />
+
+      <Link
+        href={ctaHref}
+        className="relative flex h-full flex-col justify-between p-8 md:p-10"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium tracking-widest uppercase text-white/90">
+            <span className="inline-block size-1.5 animate-pulse rounded-full bg-white" />
+            {eyebrow}
+          </div>
+          <div className="rounded-full bg-white/15 p-3 backdrop-blur transition-transform group-hover:rotate-[-45deg]">
+            <ArrowUpRight className="size-5 text-white" strokeWidth={2.5} />
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium tracking-wide text-white/80">
+            Hola,
+          </p>
+          <h2 className="font-display text-5xl font-bold leading-none tracking-tight text-white md:text-6xl">
+            {name}
+          </h2>
+          {hasSeeds && (
+            <div className="mt-4 mb-5 flex flex-wrap gap-1.5">
+              {seeds.slice(0, 6).map((s) => (
                 <span
                   key={s}
-                  className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs"
+                  className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs text-white/90 backdrop-blur"
                 >
                   {s}
                 </span>
               ))}
-              {seeds.length > 8 && (
-                <span className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground">
-                  +{seeds.length - 8}
+              {seeds.length > 6 && (
+                <span className="rounded-full border border-dashed border-white/20 px-2.5 py-1 text-xs text-white/60">
+                  +{seeds.length - 6}
                 </span>
               )}
             </div>
-            <Link
-              href="/feed"
-              className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-[var(--music-from)]"
-            >
-              Ir a mi feed <ArrowRight className="size-3.5" />
-            </Link>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Configura tus artistas favoritos y arma tu feed personal de
-            lanzamientos.
+          )}
+          {!hasSeeds && (
+            <p className="mt-3 mb-5 max-w-xs text-sm text-white/70">{subtitle}</p>
+          )}
+          <p className="inline-flex items-center gap-1.5 text-sm font-medium text-white transition-transform group-hover:translate-x-0.5">
+            {ctaLabel} <ArrowUpRight className="size-3.5" />
           </p>
-        )}
-      </div>
+        </div>
+      </Link>
     </motion.div>
   );
 }
