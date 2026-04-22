@@ -61,7 +61,7 @@ export default function FeedPage() {
     <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-12">
       <header className="mb-8 flex items-center justify-between">
         <Link
-          href="/"
+          href="/setup"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="size-4" />
@@ -102,8 +102,8 @@ export default function FeedPage() {
         <EmptyState
           title="Agregá tus artistas primero"
           body="Volvé al inicio y elegí al menos un artista que te guste."
-          ctaHref="/"
-          ctaLabel="Ir al inicio"
+          ctaHref="/setup"
+          ctaLabel="Ir al setup"
         />
       )}
 
@@ -113,7 +113,7 @@ export default function FeedPage() {
         <EmptyState
           title={`Nada fresco en ${year} todavía`}
           body="Tus artistas no sacaron nada este año aún, y la búsqueda similar no trajo nada. Probá agregar más artistas o contar qué estás escuchando hoy."
-          ctaHref="/"
+          ctaHref="/setup"
           ctaLabel="Editar"
         />
       )}
