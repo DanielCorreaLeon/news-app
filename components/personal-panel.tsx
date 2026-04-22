@@ -23,7 +23,9 @@ export function PersonalPanel({ name, fallbackCovers }: Props) {
   useEffect(() => {
     if (seeds.length === 0) return;
     const controller = new AbortController();
-    const params = new URLSearchParams({ artists: seedKey });
+    const params = new URLSearchParams({
+      artists: seeds.slice(0, 3).join(","),
+    });
     fetch(`/api/news/music?${params}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((d: { items?: MusicItem[] }) => {

@@ -34,17 +34,28 @@ async function getToken(): Promise<string> {
   return tokenCache.accessToken;
 }
 
-async function sp<T>(path: string, revalidate = 600): Promise<T> {
-  const token = await getToken();
-  const res = await fetch(`https://api.spotify.com/v1${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Spotify ${res.status} on ${path}: ${body.slice(0, 200)}`);
+async function sp<T>(path: string, revalidate = 3600): Promise<T> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const token = await getToken();
+    const res = await fetch(`https://api.spotify.com/v1${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      next: { revalidate },
+    });
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get("retry-after") ?? "2");
+      const waitMs = Math.min((retryAfter + attempt) * 1000, 4000);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `Spotify ${res.status} on ${path}: ${body.slice(0, 200)}`,
+      );
+    }
+    return (await res.json()) as T;
   }
-  return (await res.json()) as T;
+  throw new Error(`Spotify rate limited on ${path}`);
 }
 
 type SpotifyAlbum = {
@@ -54,38 +65,10 @@ type SpotifyAlbum = {
   release_date: string;
   images: Array<{ url: string; width: number; height: number }>;
   external_urls: { spotify: string };
-  artists: Array<{ name: string }>;
+  artists: Array<{ id?: string; name: string }>;
 };
 
-type ArtistSearchRes = {
-  artists: { items: Array<{ id: string; name: string }> };
-};
 type AlbumSearchRes = { albums: { items: SpotifyAlbum[] } };
-type ArtistAlbumsRes = { items: SpotifyAlbum[] };
-
-async function searchArtistCandidates(
-  name: string,
-): Promise<Array<{ id: string; name: string }>> {
-  const q = encodeURIComponent(name);
-  const data = await sp<ArtistSearchRes>(
-    `/search?q=${q}&type=artist&limit=10`,
-  );
-  return data.artists.items;
-}
-
-async function getArtistAlbums(id: string): Promise<SpotifyAlbum[]> {
-  const data = await sp<ArtistAlbumsRes>(
-    `/artists/${id}/albums?include_groups=single,album&limit=10&market=US`,
-  );
-  return data.items;
-}
-
-async function getAppearsOnAlbums(id: string): Promise<SpotifyAlbum[]> {
-  const data = await sp<ArtistAlbumsRes>(
-    `/artists/${id}/albums?include_groups=appears_on&limit=10&market=US`,
-  );
-  return data.items;
-}
 
 async function searchAlbums(query: string): Promise<SpotifyAlbum[]> {
   const q = encodeURIComponent(query);
@@ -112,42 +95,41 @@ function toMusicItem(a: SpotifyAlbum, source: ReleaseSource): MusicItem {
 type SeedResult = { seed: MusicItem[]; similar: MusicItem[] };
 
 async function getReleasesForOneSeed(name: string): Promise<SeedResult> {
+  const lower = name.toLowerCase().trim();
   try {
-    const candidates = await searchArtistCandidates(name);
-    if (candidates.length === 0) {
-      console.warn(`[spotify] no candidates for "${name}"`);
-      return { seed: [], similar: [] };
-    }
-
-    const nameLower = name.toLowerCase().trim();
-    const exact = candidates.filter(
-      (c) => c.name.toLowerCase().trim() === nameLower,
-    );
-    const toTry = exact.length > 0 ? exact : [candidates[0]];
-
-    const perCandidate = await Promise.all(
-      toTry.map(async (cand) => {
-        const [albums, appears] = await Promise.all([
-          getArtistAlbums(cand.id).catch((err) => {
-            console.error(`[spotify] albums "${cand.name}":`, err);
-            return [] as SpotifyAlbum[];
-          }),
-          getAppearsOnAlbums(cand.id).catch((err) => {
-            console.error(`[spotify] appears_on "${cand.name}":`, err);
-            return [] as SpotifyAlbum[];
-          }),
-        ]);
-        return {
-          seed: albums.map((a) => toMusicItem(a, "seed")),
-          similar: appears.map((a) => toMusicItem(a, "similar")),
-        };
+    const [strict, loose] = await Promise.all([
+      searchAlbums(`artist:"${name}"`).catch((err) => {
+        console.error(
+          `[spotify] strict "${name}":`,
+          err instanceof Error ? err.message : err,
+        );
+        return [] as SpotifyAlbum[];
       }),
-    );
+      searchAlbums(`"${name}"`).catch((err) => {
+        console.error(
+          `[spotify] loose "${name}":`,
+          err instanceof Error ? err.message : err,
+        );
+        return [] as SpotifyAlbum[];
+      }),
+    ]);
 
-    return {
-      seed: perCandidate.flatMap((p) => p.seed),
-      similar: perCandidate.flatMap((p) => p.similar),
-    };
+    const seed = strict
+      .filter((a) => {
+        const main = a.artists[0]?.name.toLowerCase().trim() ?? "";
+        return main === lower;
+      })
+      .map((a) => toMusicItem(a, "seed"));
+
+    const seedIds = new Set(seed.map((s) => s.id));
+    const similar = loose
+      .filter((a) => {
+        const main = a.artists[0]?.name.toLowerCase().trim() ?? "";
+        return main !== lower && !seedIds.has(a.id);
+      })
+      .map((a) => toMusicItem(a, "similar"));
+
+    return { seed, similar };
   } catch (err) {
     console.error(
       `[spotify] seed "${name}" failed:`,
@@ -187,17 +169,8 @@ export async function getReleasesInspiredBy(
       : Promise.resolve([] as MusicItem[]),
   ]);
 
-  const seedNamesLower = new Set(
-    uniqueSeeds.map((n) => n.toLowerCase().trim()),
-  );
-
   const seedItems = seedResults.flatMap((r) => r.seed);
-  const similarItems = seedResults
-    .flatMap((r) => r.similar)
-    .filter((item) => {
-      const mainArtist = item.artist.split(",")[0]?.toLowerCase().trim() ?? "";
-      return !seedNamesLower.has(mainArtist);
-    });
+  const similarItems = seedResults.flatMap((r) => r.similar);
 
   const all = [...seedItems, ...similarItems, ...listeningItems];
 
@@ -227,19 +200,15 @@ export async function getReleasesInspiredBy(
   return unique.slice(0, 18);
 }
 
-const LANDING_ARTIST_IDS = [
-  "06HL4z0CvFAxyc27GXpf02", // Taylor Swift
-  "4q3ewBCX7sLwd24euuV69X", // Bad Bunny
-  "1Xyo4u8uXC1ZmMpatF05PJ", // The Weeknd
-  "3TVXtAsR1Inumwj472S9r4", // Drake
-  "7ltDVBr6mKbRvohxheJ9h1", // Rosalía
-  "6qqNVTkY8uBg9cP3Jd7DAH", // Billie Eilish
-  "6M2wZ9GZgrQXHCFfjv46we", // Dua Lipa
-  "2YZyLoL8N0Wb9xBt1NhZWg", // Kendrick Lamar
-  "790FomKkXshlbRYZFtlgla", // Karol G
-  "66CXWjxzNUsdJxJ2JdwvnR", // Ariana Grande
-  "6KImCVD70vtIoJWnq6nGn3", // Harry Styles
-  "6yNG9z9CGWa1QczJxMyGY2", // Alex Warren (pop)
+const LANDING_SEED_ARTISTS = [
+  "Bad Bunny",
+  "The Weeknd",
+  "Drake",
+  "Rosalía",
+  "Billie Eilish",
+  "Kendrick Lamar",
+  "Karol G",
+  "Harry Styles",
 ];
 
 export async function getLandingCovers(): Promise<
@@ -247,9 +216,9 @@ export async function getLandingCovers(): Promise<
 > {
   try {
     const results = await Promise.allSettled(
-      LANDING_ARTIST_IDS.map((id) =>
-        sp<ArtistAlbumsRes>(
-          `/artists/${id}/albums?include_groups=single,album&limit=4&market=US`,
+      LANDING_SEED_ARTISTS.map((name) =>
+        sp<AlbumSearchRes>(
+          `/search?q=${encodeURIComponent(`artist:"${name}"`)}&type=album&limit=3&market=US`,
           3600,
         ),
       ),
@@ -257,7 +226,9 @@ export async function getLandingCovers(): Promise<
     const covers: Array<{ image: string; artist: string; title: string }> = [];
     for (const r of results) {
       if (r.status !== "fulfilled") continue;
-      const recent = r.value.items.find(
+      const items = r.value.albums.items;
+      items.sort((a, b) => b.release_date.localeCompare(a.release_date));
+      const recent = items.find(
         (a) => a.images[0]?.url && a.release_date.length >= 4,
       );
       if (recent) {
