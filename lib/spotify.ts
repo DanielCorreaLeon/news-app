@@ -80,6 +80,13 @@ async function getArtistAlbums(id: string): Promise<SpotifyAlbum[]> {
   return data.items;
 }
 
+async function getAppearsOnAlbums(id: string): Promise<SpotifyAlbum[]> {
+  const data = await sp<ArtistAlbumsRes>(
+    `/artists/${id}/albums?include_groups=appears_on&limit=10&market=US`,
+  );
+  return data.items;
+}
+
 async function searchAlbums(query: string): Promise<SpotifyAlbum[]> {
   const q = encodeURIComponent(query);
   const data = await sp<AlbumSearchRes>(
@@ -102,15 +109,14 @@ function toMusicItem(a: SpotifyAlbum, source: ReleaseSource): MusicItem {
   };
 }
 
-async function getSeedReleasesForYear(
-  name: string,
-  year: string,
-): Promise<MusicItem[]> {
+type SeedResult = { seed: MusicItem[]; similar: MusicItem[] };
+
+async function getReleasesForOneSeed(name: string): Promise<SeedResult> {
   try {
     const candidates = await searchArtistCandidates(name);
     if (candidates.length === 0) {
       console.warn(`[spotify] no candidates for "${name}"`);
-      return [];
+      return { seed: [], similar: [] };
     }
 
     const nameLower = name.toLowerCase().trim();
@@ -121,27 +127,33 @@ async function getSeedReleasesForYear(
 
     const perCandidate = await Promise.all(
       toTry.map(async (cand) => {
-        try {
-          const albums = await getArtistAlbums(cand.id);
-          return albums
-            .filter((a) => a.release_date.startsWith(year))
-            .map((a) => toMusicItem(a, "seed"));
-        } catch (err) {
-          console.error(
-            `[spotify] candidate "${cand.name}" (${cand.id}) albums failed:`,
-            err instanceof Error ? err.message : err,
-          );
-          return [] as MusicItem[];
-        }
+        const [albums, appears] = await Promise.all([
+          getArtistAlbums(cand.id).catch((err) => {
+            console.error(`[spotify] albums "${cand.name}":`, err);
+            return [] as SpotifyAlbum[];
+          }),
+          getAppearsOnAlbums(cand.id).catch((err) => {
+            console.error(`[spotify] appears_on "${cand.name}":`, err);
+            return [] as SpotifyAlbum[];
+          }),
+        ]);
+        return {
+          seed: albums.map((a) => toMusicItem(a, "seed")),
+          similar: appears.map((a) => toMusicItem(a, "similar")),
+        };
       }),
     );
-    return perCandidate.flat();
+
+    return {
+      seed: perCandidate.flatMap((p) => p.seed),
+      similar: perCandidate.flatMap((p) => p.similar),
+    };
   } catch (err) {
     console.error(
       `[spotify] seed "${name}" failed:`,
       err instanceof Error ? err.message : err,
     );
-    return [];
+    return { seed: [], similar: [] };
   }
 }
 
@@ -150,7 +162,6 @@ export async function getReleasesInspiredBy(
   excludedNames: string[] = [],
   listening?: string,
 ): Promise<MusicItem[]> {
-  const year = String(new Date().getFullYear());
   const blocked = new Set(excludedNames.map((n) => n.toLowerCase().trim()));
 
   const uniqueSeeds = Array.from(
@@ -161,15 +172,11 @@ export async function getReleasesInspiredBy(
     ),
   );
 
-  const [seedItemsNested, listeningItems] = await Promise.all([
-    Promise.all(uniqueSeeds.map((n) => getSeedReleasesForYear(n, year))),
+  const [seedResults, listeningItems] = await Promise.all([
+    Promise.all(uniqueSeeds.map((n) => getReleasesForOneSeed(n))),
     listening
-      ? searchAlbums(`${listening} year:${year}`)
-          .then((albums) =>
-            albums
-              .filter((a) => a.release_date.startsWith(year))
-              .map((a) => toMusicItem(a, "listening")),
-          )
+      ? searchAlbums(listening)
+          .then((albums) => albums.map((a) => toMusicItem(a, "listening")))
           .catch((err) => {
             console.error(
               `[spotify] listening "${listening}" failed:`,
@@ -180,7 +187,19 @@ export async function getReleasesInspiredBy(
       : Promise.resolve([] as MusicItem[]),
   ]);
 
-  const all = [...seedItemsNested.flat(), ...listeningItems];
+  const seedNamesLower = new Set(
+    uniqueSeeds.map((n) => n.toLowerCase().trim()),
+  );
+
+  const seedItems = seedResults.flatMap((r) => r.seed);
+  const similarItems = seedResults
+    .flatMap((r) => r.similar)
+    .filter((item) => {
+      const mainArtist = item.artist.split(",")[0]?.toLowerCase().trim() ?? "";
+      return !seedNamesLower.has(mainArtist);
+    });
+
+  const all = [...seedItems, ...similarItems, ...listeningItems];
 
   const notBlocked = all.filter(
     (it) =>

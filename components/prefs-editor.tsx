@@ -129,7 +129,8 @@ export function PrefsEditor({ prefs, onChange, accentFrom }: Props) {
       )}
 
       <p className="mt-3 text-xs text-muted-foreground text-pretty">
-        Los usamos como inspiración — vas a ver lanzamientos de ellos y de artistas similares.
+        Los usamos como inspiración. Verás lanzamientos de ellos y de artistas
+        similares.
       </p>
     </div>
   );

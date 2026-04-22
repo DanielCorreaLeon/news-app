@@ -55,7 +55,6 @@ export default function FeedPage() {
   };
 
   const counts = items ? groupBySource(items) : null;
-  const year = new Date().getFullYear();
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-12">
@@ -82,7 +81,7 @@ export default function FeedPage() {
         className="mb-8"
       >
         <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground">
-          Lanzamientos de {year}
+          Últimos lanzamientos
         </p>
         <h1 className="font-display text-4xl font-bold tracking-tighter md:text-6xl">
           Tu feed musical
@@ -92,7 +91,7 @@ export default function FeedPage() {
             {counts.seed} de tus artistas
             {counts.similar > 0 ? ` · ${counts.similar} similares` : ""}
             {counts.listening > 0
-              ? ` · ${counts.listening} de lo que escuchás hoy`
+              ? ` · ${counts.listening} de lo que escuchas hoy`
               : ""}
           </p>
         )}
@@ -100,8 +99,8 @@ export default function FeedPage() {
 
       {!hasPrefs && (
         <EmptyState
-          title="Agregá tus artistas primero"
-          body="Volvé al inicio y elegí al menos un artista que te guste."
+          title="Añade tus artistas primero"
+          body="Vuelve al inicio y elige al menos un artista que te guste."
           ctaHref="/setup"
           ctaLabel="Ir al setup"
         />
@@ -111,8 +110,8 @@ export default function FeedPage() {
 
       {hasPrefs && items && items.length === 0 && !error && (
         <EmptyState
-          title={`Nada fresco en ${year} todavía`}
-          body="Tus artistas no sacaron nada este año aún, y la búsqueda similar no trajo nada. Probá agregar más artistas o contar qué estás escuchando hoy."
+          title="Sin lanzamientos por ahora"
+          body="No encontramos nada para tus artistas. Prueba añadir más o escribe un género o álbum en el setup."
           ctaHref="/setup"
           ctaLabel="Editar"
         />
@@ -124,8 +123,8 @@ export default function FeedPage() {
 
       {error && (
         <p className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
-          No pude traer los lanzamientos: {error}. Chequeá las claves de Spotify en{" "}
-          <code className="rounded bg-black/20 px-1">.env.local</code>.
+          No pudimos traer los lanzamientos: {error}. Revisa las claves de Spotify
+          en <code className="rounded bg-black/20 px-1">.env.local</code>.
         </p>
       )}
     </main>

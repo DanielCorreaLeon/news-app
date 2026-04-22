@@ -33,7 +33,7 @@ const SIZE_ASPECT: Record<BentoSize, string> = {
 const SOURCE_LABEL: Record<MusicItem["source"], string> = {
   seed: "Tus artistas",
   similar: "Similar",
-  listening: "Para vos hoy",
+  listening: "Para ti hoy",
 };
 
 export function NewsCard({ item, size, index, accentFrom }: Props) {

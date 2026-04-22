@@ -54,7 +54,7 @@ export function SetupScreen({
           Daily
         </span>
         <span className="ml-auto hidden text-xs tracking-widest uppercase text-muted-foreground md:inline">
-          {new Intl.DateTimeFormat("es-AR", {
+          {new Intl.DateTimeFormat("es", {
             weekday: "long",
             day: "2-digit",
             month: "long",
@@ -77,11 +77,12 @@ export function SetupScreen({
           <span className="bg-gradient-to-r from-[var(--music-from)] via-[var(--music-to)] to-[oklch(0.6_0.2_240)] bg-clip-text text-transparent">
             lanzamientos
           </span>
-          , inspirados en vos.
+          , inspirados en ti.
         </h1>
         <p className="mt-5 max-w-xl text-base text-muted-foreground text-pretty md:text-lg">
-          Contame qué artistas te prenden y qué estás escuchando hoy. Armamos un feed
-          con releases de este año — de tus artistas y de otros que suenan parecido.
+          Cuéntanos qué artistas te gustan y qué estás escuchando hoy. Te armamos
+          un feed con los últimos lanzamientos, de tus artistas y de otros que
+          suenan parecido.
         </p>
       </motion.div>
 
@@ -99,7 +100,10 @@ export function SetupScreen({
           className="rounded-2xl border border-border bg-card/40 p-4 md:p-5"
         >
           <label className="mb-2 block text-xs tracking-wider uppercase text-muted-foreground">
-            ¿Qué estás escuchando hoy? <span className="lowercase text-foreground/40">(opcional, pero ayuda)</span>
+            ¿Qué estás escuchando hoy?{" "}
+            <span className="lowercase text-foreground/40">
+              (opcional, pero ayuda)
+            </span>
           </label>
           <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <input
@@ -112,7 +116,7 @@ export function SetupScreen({
                 }
               }}
               placeholder={
-                savedNote ?? "un género, un álbum, un vibe, un artista nuevo…"
+                savedNote ?? "un género, un álbum, un estilo, un artista nuevo…"
               }
               className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
@@ -161,7 +165,7 @@ export function SetupScreen({
         >
           <div>
             <p className="text-xs tracking-widest uppercase opacity-80">
-              {hasSeeds ? "Todo listo" : "Agregá al menos un artista"}
+              {hasSeeds ? "Todo listo" : "Agrega al menos un artista"}
             </p>
             <p className="font-display text-3xl font-bold md:text-4xl">
               Ver mi feed
