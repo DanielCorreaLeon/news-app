@@ -1,211 +1,311 @@
 # Handoff — Daily News App
 
-> Punto de entrada para entender todo el proyecto. Si abres un chat nuevo con Claude, pega este archivo y Claude puede continuar sin preguntar nada.
+> **Punto único de entrada.** Si abres un chat nuevo con Claude, pega este archivo y Claude puede continuar sin preguntar nada.
 
-## 1. Qué es
+---
 
-App web personal de **Daniel** (primer proyecto web full-stack). Muestra lanzamientos musicales personalizados:
-- **Seeds**: lanzamientos de los artistas que el usuario configura (chips)
-- **Similares**: colaboraciones de esos artistas con otros (via búsqueda en Spotify)
-- **Para ti hoy**: resultados de lo que escribe en el campo "¿Qué estás escuchando?"
+## 🔗 Enlaces importantes (todo lo que necesitas)
 
-**Objetivo:** que sea **visualmente impresionante**. El feed es un bento grid con tamaños variados (hero 2×2, wide 2×1, tall 1×2, square 1×1, banner 4×1), portadas reales grandes, gradientes oscuros y tipografía display bold. Landing con 2 cards simétricas (CTA + panel personal con mosaico).
-
-## 2. Stack
-
-- **Next.js 16.2.4** (App Router, Turbopack, React 19.2.4)
-- **TypeScript 5** (strict)
-- **Tailwind CSS 4** + **shadcn/ui** (neutral base, dark mode forzado)
-- **Motion** (framer-motion v12) — transiciones
-- **Lucide React** — iconos
-- **Spotify Web API** (Client Credentials, sin login de usuario)
-- **Idioma:** español neutro (ni argentino, ni castellano)
-
-Dependencias AI/IA fueron removidas (sin Claude API, sin NewsAPI).
-
-**Persistencia:** **solo `localStorage`**. No hay base de datos.
-
-**Deploy:** Vercel (plugin + CLI configurados globalmente, user `danielcorrealeon-3288`).
-
-## 3. Ubicación
-
-```
-/Users/danielcorrea/Documents/Daniel/Claude code/news-app/
-```
-
-Repo git independiente. GitHub: `DanielCorreaLeon/news-app` (pendiente de crear al desplegar).
-
-## 4. Versiones guardadas en git
-
-Cada versión está taggeada. Para volver a una: `git checkout vN`.
-
-| Tag | Descripción |
+| Qué | URL / ubicación |
 |---|---|
-| `v1` | Landing con 2 cards (Música + IA). HN para IA news. Sin filtro de año. Bugs con homónimos. |
-| `v2` | Solo música. Filtro de 2026 (causa feed vacío con muchos artistas). |
-| `v3` | Fixes del límite de Spotify (apps nuevas capadas a `limit=10`). |
-| `v4` | Landing 2 cols, español neutro, `appears_on` para similares. |
-| `v5` | Cards simétricas aspect-[4/5] en landing. |
-| `v6` ⭐ | **Actual.** Pivot a `search` API (evita rate-limit de `/artists/{id}/albums`). |
+| **App en vivo** (producción) | https://news-app-danielcorrealeon-3288s-projects.vercel.app |
+| **Código fuente** (GitHub, público) | https://github.com/DanielCorreaLeon/news-app |
+| **Dashboard Vercel** | https://vercel.com/danielcorrealeon-3288s-projects/news-app |
+| **Spotify Developer Dashboard** | https://developer.spotify.com/dashboard (app: "Daily News" o similar) |
+| **Carpeta local del proyecto** | `/Users/danielcorrea/Documents/Daniel/Claude code/news-app/` |
+| **Archivo de credenciales locales** | `.env.local` (NO está en git, NO se sube a Vercel, vive solo en tu Mac) |
 
-## 5. Estructura de archivos
+**Cuentas involucradas**
+- GitHub: `DanielCorreaLeon` (autenticado via `gh` CLI)
+- Vercel: `danielcorrealeon-3288` (autenticado via `vercel` CLI, plan Hobby, gratis)
+- Spotify Developer: tu cuenta de Spotify personal
+
+---
+
+## 🚀 Qué hace la app
+
+Agregador personal de lanzamientos musicales:
+- **Seeds**: lanzamientos de los artistas que configuras con chips en `/setup`
+- **Similares**: colaboraciones de esos artistas con otros (vía búsqueda en Spotify)
+- **Para ti hoy**: resultados del campo "¿Qué estás escuchando hoy?"
+
+**Flujo**: Landing (`/`) → Setup (`/setup`) con chips + listening → Feed (`/feed`) con bento grid.
+
+Las preferencias viven en `localStorage` del navegador. No hay base de datos, no hay auth.
+
+---
+
+## 📁 Estructura del proyecto
 
 ```
 news-app/
 ├── HANDOFF.md                       ← este archivo
 ├── README.md                        ← setup corto
-├── .env.local.example               ← solo Spotify (2 claves)
-├── .env.local                       ← secretos locales, no en git
-├── package.json                     ← sin AI SDK, sin newsapi
+├── .env.local.example               ← template con 2 claves de Spotify
+├── .env.local                       ← secretos locales (gitignoreado)
+├── .vercel/project.json             ← linking a Vercel (id del proyecto)
+├── package.json
 ├── next.config.ts                   ← images.remotePatterns: **
-├── tsconfig.json                    ← paths @/* → ./*
 ├── app/
-│   ├── layout.tsx                   ← fuentes (Geist + Space Grotesk), html.dark, gradientes de fondo, grain
-│   ├── globals.css                  ← tokens oklch (music-from/to), utilidades .font-display/.glass/.grain
-│   ├── page.tsx                     ← LANDING: server, fetch getLandingCovers, dos cards en grid
-│   ├── setup/
-│   │   └── page.tsx                 ← SETUP: client, chips + input listening + CTA "Ver mi feed"
-│   ├── feed/
-│   │   └── page.tsx                 ← FEED: client, fetch /api/news/music, BentoGrid
-│   └── api/news/music/route.ts      ← GET artists=...&exclude=...&listening=... → llama lib/spotify
+│   ├── layout.tsx                   ← fuentes (Geist + Space Grotesk), html.dark
+│   ├── globals.css                  ← tokens oklch, utilidades grain/glass
+│   ├── page.tsx                     ← LANDING server component
+│   ├── setup/page.tsx               ← SETUP client, chips + listening
+│   ├── feed/page.tsx                ← FEED client, bento grid
+│   └── api/news/music/route.ts      ← GET artists/exclude/listening → Spotify
 ├── components/
-│   ├── feed-cta-card.tsx            ← card izq de la landing (gradient violeta + Disc3)
-│   ├── personal-panel.tsx           ← card der de la landing (mosaico 2x2 + chips + "Ir a mi feed")
-│   ├── cover-wall.tsx               ← background grid de portadas en landing
-│   ├── setup-screen.tsx             ← pantalla de setup (sin chat, solo configuración)
-│   ├── prefs-editor.tsx             ← chips editables de artistas
-│   ├── bento-grid.tsx               ← CSS Grid 4-col con patrón de spans
-│   ├── news-card.tsx                ← 5 variantes (hero/wide/tall/square/banner) + badge de source
-│   ├── image-with-fallback.tsx      ← <img> con fallback gradient si 404/null
-│   ├── feed-skeleton.tsx            ← shimmer mientras carga
-│   └── ui/                          ← button, card, input, avatar, badge, skeleton (shadcn)
+│   ├── feed-cta-card.tsx            ← card izq del landing
+│   ├── personal-panel.tsx           ← card der del landing (mosaico + chips)
+│   ├── cover-wall.tsx               ← grid de portadas de fondo
+│   ├── setup-screen.tsx
+│   ├── prefs-editor.tsx
+│   ├── bento-grid.tsx
+│   ├── news-card.tsx                ← 5 variantes de tamaño
+│   ├── image-with-fallback.tsx
+│   ├── feed-skeleton.tsx
+│   └── ui/                          ← shadcn
 └── lib/
-    ├── types.ts                     ← MusicPrefs, MusicItem, ReleaseSource
-    ├── preferences.ts               ← getMusicPrefs/setMusicPrefs + useMusicPrefs (useSyncExternalStore)
-    └── spotify.ts                   ← getReleasesInspiredBy, getLandingCovers (solo usa /search)
-```
-
-## 6. Cómo funciona
-
-### Landing (`app/page.tsx`)
-- Server component con `revalidate = 3600`.
-- Fetch `getLandingCovers()` → 8 artistas populares, 1 portada cada uno (cacheado 1h en servidor Next).
-- Render: header, hero text, grid 2-col con `<FeedCtaCard />` izq + `<PersonalPanel />` der.
-- `<CoverWall />` con las portadas en grid 4x3 de fondo al 38% opacity.
-
-### Setup (`/setup`)
-- Client, usa `useMusicPrefs()` hook.
-- Muestra `<PrefsEditor />` (chips editables de artistas) + campo "¿Qué estás escuchando hoy?" (opcional).
-- Al guardar la nota, se escribe en `lastSession.listening`.
-- Botón "Ver mi feed →" navega a `/feed`.
-
-### Feed (`/feed`)
-- Client, usa `useMusicPrefs()`, hace fetch a `/api/news/music?artists=...&listening=...`.
-- Muestra loading skeleton → BentoGrid.
-- Cada card muestra su source: "Tus artistas", "Similar", "Para ti hoy".
-- Botón refresh invalida y reactualiza.
-
-### API `/api/news/music`
-- Recibe `artists`, `exclude`, `listening` (todo como CSV/texto en query string).
-- Llama a `getReleasesInspiredBy(artists, exclude, listening)`.
-- Devuelve `{ items: MusicItem[] }`.
-
-### `lib/spotify.ts` — núcleo
-
-**Token**: Client Credentials, cacheado en memoria hasta expirar.
-
-**Rate limit**: ⚠️ `/artists/{id}/albums` está severamente rate-limited para apps no-extended (retry-after hasta 23h). **Solución v6**: usamos SOLO el endpoint `/search` que tiene quota separada y más generosa.
-
-**Algoritmo por seed artist** (`getReleasesForOneSeed`):
-- `search?q=artist:"Nombre"&type=album&limit=10` → filtra por main artist match exacto → **seeds**
-- `search?q="Nombre"&type=album&limit=10` → filtra donde main artist NO sea el seed → **similares** (colaboraciones)
-
-**Listening**: `search?q=<texto-libre>&type=album&limit=10` → tag `listening`.
-
-**Merge**: dedupe por album ID, prioriza seed > listening > similar, sort por release_date desc, cap a 18.
-
-### Preferences (`lib/preferences.ts`)
-- `useSyncExternalStore` para hidratación correcta en React 19.
-- Cache en memoria + listeners para notificar cambios.
-- 1 sola key de localStorage: `news-app.music-prefs.v1`.
-
-## 7. Setup local
-
-```bash
-cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
-cp .env.local.example .env.local
-# editar .env.local y pegar SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET
-npm install   # deps ya instaladas, idempotente
-npm run dev
-# abrir http://localhost:3000
-```
-
-### Credenciales Spotify
-- https://developer.spotify.com/dashboard → Create app
-- Redirect URI: `http://127.0.0.1:3000` (Spotify rechaza `http://localhost:...` por política nueva)
-- Copiar Client ID + Client Secret a `.env.local`
-
-## 8. Estado actual (verificado)
-
-- ✅ Build limpio (`npm run build`)
-- ✅ Typecheck limpio (`npx tsc --noEmit`)
-- ✅ Lint limpio (`npm run lint`)
-- ✅ Feed funciona con Bad Bunny (seeds + similares reales como Aventura, J Balvin, Ozuna)
-- ✅ Feed funciona con Harry Styles (2026 releases: Kiss All The Time, Aperture)
-- ⚠️ Algunos artistas solistas puros (Harry Styles) no traen similares porque no tienen colaboraciones en Spotify — la "columna" similar queda vacía para ellos.
-
-## 9. Lo que SÍ hay que saber antes de iterar
-
-- **Spotify rate-limits severos**: `/artists/{id}/albums`, `/top-tracks`, `/related-artists`, `/recommendations`, `genre:` filter en search, `/browse/new-releases` → todos bloqueados o 403 para apps no-extended. **Solo funciona bien `/search`.**
-- **`limit` máximo de Spotify search**: 10. No pidas más, tira 400.
-- **Spotify dejó de incluir `genres` y `popularity`** en los objetos de artista (security/privacy change reciente).
-- **Preferencias solo en localStorage**. Si Daniel limpia cookies/storage, pierde todo. Decisión explícita para MVP.
-
-## 10. Lo que NO hacer sin preguntar
-
-- Agregar base de datos (Postgres, Redis, etc.)
-- Agregar auth (NextAuth, Clerk, Spotify OAuth)
-- Cambiar el stack
-- Borrar localStorage en algún flujo automático
-- Conectar analytics
-
-## 11. Ideas para iterar (no urgentes)
-
-- **Spotify user OAuth** para acceder a top tracks reales del usuario (mejora masiva del panel personal, pero agrega complejidad)
-- **Last.fm API** como fuente alternativa de similares (más limpios que appears_on)
-- **Guardar favoritos** en localStorage (toggle ♥ en cada card del bento)
-- **Share del feed** por URL (serializar prefs en query string)
-- **Push notifications** cuando un artista seed suelta algo nuevo
-
-## 12. Contactos / integraciones externas
-
-| Servicio | Auth | Límites |
-|---|---|---|
-| Spotify Web API | Client Credentials | `/search` generoso, `/artists/{id}/*` bloqueado hasta 23h en rate-limit |
-| Vercel | Plugin + CLI, user `danielcorrealeon-3288` | Hobby plan free |
-| GitHub | gh CLI, user `DanielCorreaLeon` (token en keyring) | - |
-
-## 13. Comandos útiles
-
-```bash
-# dev
-npm run dev
-
-# checks
-npm run build
-npx tsc --noEmit
-npm run lint
-
-# git versiones
-git tag -l                 # listar tags
-git checkout v1            # saltar a una versión vieja (crea detached HEAD)
-git checkout main          # volver
-
-# deploy
-vercel deploy              # preview
-vercel --prod              # production
+    ├── types.ts
+    ├── preferences.ts               ← useSyncExternalStore para localStorage
+    └── spotify.ts                   ← getReleasesInspiredBy, getLandingCovers (solo /search)
 ```
 
 ---
 
-*Última actualización: v6 (search-only pivot). Si algo cambió, verificar contra el código antes de asumir.*
+## 🛠️ Operar el proyecto
+
+### Correr localmente
+```bash
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+npm run dev
+# abrir http://localhost:3000
+```
+
+El archivo `.env.local` ya está creado con tus claves de Spotify. Si alguna vez se pierde, copiá `.env.local.example` y pegá tus credenciales del dashboard de Spotify.
+
+### Desplegar cambios a producción
+```bash
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+# editá el código
+git add -A
+git commit -m "mensaje del cambio"
+git push
+# Vercel auto-deploya en ~30s. Mirá el resultado en la URL de producción.
+```
+
+**No hace falta hacer nada en Vercel manualmente.** Cada `git push` a `main` deploya automáticamente.
+
+### Ver todos los deployments
+```bash
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+vercel ls news-app
+```
+
+### Rollback a una versión anterior
+```bash
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+git tag -l                    # listar versiones (v1, v2, v3, v4, v5, v6)
+git checkout v5               # ir a v5 (modo lectura)
+git checkout main             # volver a la última
+
+# Para hacer rollback real en producción:
+git reset --hard v5           # ⚠️ reescribe main a v5
+git push --force              # ⚠️ auto-deploya esa versión
+```
+
+### Gestionar variables de entorno en Vercel
+```bash
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+vercel env ls                                           # listar
+vercel env rm SPOTIFY_CLIENT_ID production --yes        # borrar
+printf "%s" "NUEVO_VALOR" | vercel env add SPOTIFY_CLIENT_ID production
+# importante: usar printf (sin \n), NO echo
+```
+
+### Chequeos antes de pushear
+```bash
+npm run build          # build production (obligatorio pasar antes de pushear)
+npm run lint           # eslint
+npx tsc --noEmit       # typecheck
+```
+
+---
+
+## 📦 Versiones guardadas (git tags)
+
+Cada versión está taggeada. Para volver: `git checkout vN`.
+
+| Tag | Estado | Descripción |
+|---|---|---|
+| `v1` | archivada | Landing con 2 cards (Música + IA). HN para IA news. Sin filtro de año. |
+| `v2` | archivada | Solo música. Filtro de 2026 (causa feed vacío si artista no tiene releases este año). |
+| `v3` | archivada | Fix del límite de Spotify (apps nuevas capadas a `limit=10`). |
+| `v4` | archivada | Landing 2 cols, español neutro, `appears_on` para similares. |
+| `v5` | archivada | Cards simétricas aspect-[4/5]. |
+| **`v6`** | **✅ actual, deployada** | Pivot a `search` API (evita rate-limit de `/artists/{id}/albums`). |
+
+---
+
+## 🔑 Credenciales Spotify (dónde vive cada parte)
+
+1. **Spotify Developer Dashboard** (donde creaste la app)
+   - URL: https://developer.spotify.com/dashboard
+   - App name: la que creaste (probablemente "Daily News")
+   - Redirect URI registrada: `http://127.0.0.1:3000` (NO se usa, pero Spotify lo exige)
+   - Flow: Client Credentials (sin login de usuario)
+
+2. **Archivo local** (`.env.local`, gitignoreado, vive solo en tu Mac)
+   ```
+   SPOTIFY_CLIENT_ID=407170f1a81347fe909e298abf4fcfe0
+   SPOTIFY_CLIENT_SECRET=3084a772f7d5452b82bdf1dde3b0b59c
+   ```
+
+3. **En Vercel** (ya configurado, cifrado en su sistema)
+   - Entornos: Production, Development, Preview
+   - Variables: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+   - Dashboard: https://vercel.com/danielcorrealeon-3288s-projects/news-app/settings/environment-variables
+
+**Si alguna vez necesitas rotar las claves** (ejemplo: se filtran): ir al dashboard de Spotify, regenerar el secret, actualizar `.env.local` y las env vars en Vercel, redeployar con `git push` (commit vacío: `git commit --allow-empty -m "rotate creds" && git push`).
+
+---
+
+## 🧠 Cómo funciona el código
+
+### Landing (`app/page.tsx`) — server component
+- `revalidate = 3600` (regenera la página cada hora máximo)
+- Fetch `getLandingCovers()` → 8 artistas populares, 1 portada cada uno
+- Renderiza: `<CoverWall />` de fondo + 2 cards (`<FeedCtaCard />` + `<PersonalPanel />`)
+
+### Setup (`/setup`) — client component
+- `useMusicPrefs()` hook lee de localStorage
+- Chips editables de artistas + campo opcional "¿Qué estás escuchando?"
+- Al guardar la nota, se escribe en `lastSession.listening`
+- Botón "Ver mi feed →" → `/feed`
+
+### Feed (`/feed`) — client component
+- `useMusicPrefs()` → fetch a `/api/news/music?artists=...&listening=...`
+- Skeleton mientras carga → `<BentoGrid />` con patrón fijo de tamaños
+- Cada card muestra su source: "Tus artistas", "Similar", "Para ti hoy"
+
+### API `/api/news/music`
+- Recibe `artists`, `exclude`, `listening` en querystring
+- Llama a `getReleasesInspiredBy(artists, exclude, listening)` de `lib/spotify.ts`
+
+### `lib/spotify.ts` — núcleo
+- **Token**: Client Credentials, cacheado en memoria hasta expirar
+- **SOLO usa `/search`** (otros endpoints están rate-limited o deprecated)
+- Por cada seed:
+  - `search?q=artist:"Nombre"&type=album` → filtro main artist match → **seeds**
+  - `search?q="Nombre"&type=album` → filtro main artist NO es seed → **similares** (colaboraciones)
+- Listening: `search?q=<texto>&type=album` → tag **listening**
+- Merge: dedupe por album ID, prioridad seed > listening > similar, sort release_date desc, cap 18
+
+---
+
+## ⚠️ Gotchas que tienes que saber
+
+### 1. Spotify rate-limits severos
+Estos endpoints NO se pueden usar con apps nuevas (Client Credentials sin extensión de cuota):
+- `/artists/{id}/albums` → 429 con retry-after de 20+ horas si se abusa
+- `/artists/{id}/top-tracks` → 403
+- `/artists/{id}/related-artists` → 403
+- `/recommendations` → 403
+- `/browse/new-releases` → 403
+- `genre:` filter en search → devuelve 0
+
+**Workaround actual**: usamos EXCLUSIVAMENTE `/search`, que tiene quota separada y generosa.
+
+### 2. Límite de 10 resultados
+Las apps no-extended tienen `limit=10` máximo en `/search`. Pedir más tira error 400 "Invalid limit".
+
+### 3. localStorage es por navegador
+Las preferencias NO se sincronizan entre dispositivos. Si abres la app en otro browser o cierras caché, tienes que reconfigurar tus artistas.
+
+### 4. El email del commit importa
+En Hobby plan con repo privado, Vercel rechaza deploys si el autor del commit no está verificado en tu cuenta de GitHub. **Por eso el repo es PÚBLICO** (los repos públicos no tienen esa restricción).
+
+Si alguna vez quieres volver a privado, antes asegúrate de que `git config user.email` matchee un email verificado en tu cuenta de GitHub (`DanielCorreaLeon`).
+
+### 5. Spotify dejó de incluir `genres` y `popularity`
+Los endpoints de artist ya no retornan estos campos (cambio reciente de privacidad). Por eso no podemos filtrar por género.
+
+### 6. Las env vars en Vercel son **por deployment**
+Si cambias una env var en el dashboard, los deployments ANTERIORES siguen usando el valor viejo. **Siempre redeploy después de tocar env vars**: `git commit --allow-empty -m "update env" && git push`.
+
+---
+
+## 🚫 Lo que NO hacer sin pensarlo
+
+- Agregar base de datos (Postgres, Redis, etc.)
+- Agregar auth (NextAuth, Clerk, Spotify OAuth de usuario)
+- Cambiar el stack (Next.js + shadcn está funcionando)
+- Borrar localStorage en algún flujo automático
+- Volver el repo privado (rompe deploys)
+- Conectar analytics sin revisar privacidad
+- Usar `echo` para setear env vars de Vercel (agrega `\n` al final que rompe la auth)
+
+---
+
+## 💡 Ideas para iterar (no urgentes)
+
+- **Spotify user OAuth** para acceder a top tracks reales del usuario (mejora el panel personal, agrega complejidad)
+- **Last.fm API** como fuente alternativa de similares (más limpios que `appears_on`)
+- **Guardar favoritos** (toggle ♥ en cada card del bento, persist en localStorage)
+- **Share del feed** por URL (serializar prefs en query string)
+- **Dominio custom** (configurable en Vercel dashboard → Settings → Domains)
+
+---
+
+## 🧰 Referencia rápida de comandos
+
+```bash
+# ir al proyecto
+cd "/Users/danielcorrea/Documents/Daniel/Claude code/news-app"
+
+# correr local
+npm run dev                   # http://localhost:3000
+
+# deploy (automático, solo pushear)
+git add -A && git commit -m "cambio" && git push
+
+# ver deployments
+vercel ls news-app
+
+# ver env vars
+vercel env ls
+
+# logs en vivo de Vercel (puede tener delay según status de Vercel)
+vercel logs https://news-app-danielcorrealeon-3288s-projects.vercel.app
+
+# checks antes de pushear
+npm run build && npm run lint && npx tsc --noEmit
+
+# volver a una versión anterior
+git checkout v5               # inspeccionar
+git reset --hard v5 && git push --force   # ⚠️ rollback real
+```
+
+---
+
+## 📞 Si algo rompe
+
+1. **App en blanco en Vercel / feed vacío**
+   - `vercel logs <URL>` para ver errores del servidor
+   - Chequear que env vars estén bien: `vercel env pull /tmp/check.txt --environment production && grep SPOTIFY /tmp/check.txt` (NO deben tener `"..."` ni `\n`)
+   - Si hay `\n`, borrar y re-agregar con `printf` (ver sección "Gestionar variables de entorno")
+
+2. **"Error: Spotify rate limited"**
+   - Significa que estamos haciendo demasiadas requests. Normalmente se resuelve solo en minutos/horas.
+   - Si persiste 24h+, probablemente te excediste con `/artists/{id}/albums` — el código v6 ya NO usa ese endpoint, pero si modificaste algo, verifica.
+
+3. **Deploy en estado "Error"**
+   - Chequear `vercel inspect <deployment-url>` para ver el errorLink
+   - Causa más común: email del commit no verificado. Como el repo es público, esto no debería pasar.
+
+4. **"No sé qué hace este código"**
+   - Pegá este HANDOFF.md en un chat nuevo con Claude.
+   - Claude lo entiende completo.
+
+---
+
+*Última actualización: v6 deployada en Vercel y funcionando. Fecha: 2026-04-22.*
