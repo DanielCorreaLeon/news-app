@@ -1,6 +1,6 @@
-# Daily — News App
+# Daily — Song App
 
-Agregador visual personal de noticias de **música** (nuevos lanzamientos) e **inteligencia artificial** (novedades y herramientas). Construido con Next.js 16, shadcn/ui, Vercel AI SDK, Spotify Web API y NewsAPI.org.
+Agregador visual personal de noticias de **música** (nuevos lanzamientos). Construido con Next.js 16, shadcn/ui, Vercel AI SDK, Spotify Web API y NewsAPI.org.
 
 ## Setup
 
